@@ -50,9 +50,10 @@
 							let description = rowItems[1];
 							let namesPipeDelimited = rowItems[2];
 							let names = namesPipeDelimited.split("|");
-							let sharePerPerson = Math.round(cost / names.length);
+							let baseShare = Math.floor(cost / names.length);
+							let remainder = cost - (baseShare * names.length);
 							
-							addShareToEachPerson(shareJson, sharePerPerson, description, names);
+							addShareToEachPerson(shareJson, baseShare, remainder, description, names);
 							totalCost += cost;
 						});
 						
@@ -76,10 +77,7 @@
 						$("#message").html(`<div>
 							Total cost from the line items above: 
 							$${(totalCost / 100).toFixed(2)}.
-							This might not be equal to the calculated sum below due to rounding
-							off individual contributions to the nearest cent.
-							This happens when a line item is not divisible by the
-							corresponding number of people (e.g., $10 into 3 people).</div>`);
+							</div>`);
                         $("#line-items-textarea").addClass('is-valid');
 						$("#share-table tbody").append(rowHtml("Sum", peopleSum, ""));
 					}
@@ -97,9 +95,17 @@
                 return NaN;
             }
 
-			function addShareToEachPerson(shareJson, sharePerPerson, description, names) {
+			function addShareToEachPerson(shareJson, baseShare, remainder, description, names) {
+				// Shuffle the indices to randomly distribute the extra cents
+				let indices = names.map((_, i) => i);
+				shuffleArray(indices);
+				let extraCentIndices = new Set(indices.slice(0, remainder));
+				
 				$.each(names, function( index, name ) {
 					name = name.trim();
+					
+					// Distribute remainder: randomly selected people pay 1 cent more
+					let shareForThisPerson = baseShare + (extraCentIndices.has(index) ? 1 : 0);
 					
 					let people = shareJson.people.filter(p => p.name.toUpperCase() === name.toUpperCase());
 					let person;
@@ -118,9 +124,16 @@
 					
 					person.shares.push({
 						description: description,
-						cost: +(sharePerPerson.toFixed(2))
+						cost: shareForThisPerson
 					});
 				});
+			}
+			
+			function shuffleArray(array) {
+				for (let i = array.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[array[i], array[j]] = [array[j], array[i]];
+				}
 			}
 			
 			function rowHtml(name, share, breakdown) {
